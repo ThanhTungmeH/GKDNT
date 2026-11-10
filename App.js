@@ -15,7 +15,7 @@ import {
   KeyboardAvoidingView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { db } from './firebaseConfig';
+import { app, db } from './firebaseConfig';
 import {
   collection,
   addDoc,
@@ -23,14 +23,13 @@ import {
   deleteDoc,
   doc,
   onSnapshot,
-  query,
-  orderBy,
   serverTimestamp
 } from 'firebase/firestore';
 
 // Kiểm tra xem đã cấu hình Firebase thật chưa
 const isFirebaseConfigured = () => {
-  return db && db._options && !db._options.apiKey.includes('YOUR_API_KEY');
+  const apiKey = app?.options?.apiKey || '';
+  return Boolean(apiKey && !apiKey.includes('YOUR_API_KEY'));
 };
 
 export default function App() {
@@ -39,6 +38,7 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+  const [permissionError, setPermissionError] = useState(false);
 
   // Form state (Có thể đổi tên trường theo đề thi của giảng viên)
   const [title, setTitle] = useState('');
@@ -49,20 +49,31 @@ export default function App() {
   useEffect(() => {
     if (isFirebaseConfigured()) {
       try {
-        const q = query(collection(db, 'items'), orderBy('createdAt', 'desc'));
+        const colRef = collection(db, 'items');
         const unsubscribe = onSnapshot(
-          q,
+          colRef,
           (snapshot) => {
             const list = snapshot.docs.map((d) => ({
               id: d.id,
               ...d.data(),
             }));
+            // Sắp xếp bản ghi mới nhất lên đầu
+            list.sort((a, b) => {
+              const timeA = a.createdAt?.seconds || 0;
+              const timeB = b.createdAt?.seconds || 0;
+              return timeB - timeA;
+            });
             setItems(list);
             setLoading(false);
+            setPermissionError(false);
           },
           (error) => {
             console.error('Firestore Error:', error);
-            Alert.alert('Lỗi', 'Không thể kết nối Firestore: ' + error.message);
+            if (error.code === 'permission-denied') {
+              setPermissionError(true);
+            } else {
+              Alert.alert('Lỗi Firestore', error.message);
+            }
             setLoading(false);
           }
         );
@@ -158,7 +169,14 @@ export default function App() {
       }
       setModalVisible(false);
     } catch (error) {
-      Alert.alert('Lỗi khi lưu', error.message);
+      if (error.code === 'permission-denied') {
+        Alert.alert(
+          'Lỗi quyền ghi Firebase',
+          'Chưa có quyền ghi dữ liệu! Vui lòng vào Firebase Console -> Firestore -> tab Rules và đổi thành:\nallow read, write: if true;\nrồi bấm Publish.'
+        );
+      } else {
+        Alert.alert('Lỗi khi lưu', error.message);
+      }
     }
   };
 
@@ -172,7 +190,14 @@ export default function App() {
       try {
         await deleteDoc(doc(db, 'items', item.id));
       } catch (error) {
-        Alert.alert('Lỗi khi xóa', error.message);
+        if (error.code === 'permission-denied') {
+          Alert.alert(
+            'Lỗi quyền xóa Firebase',
+            'Chưa có quyền xóa dữ liệu! Vui lòng kiểm tra tab Rules trên Firebase Console.'
+          );
+        } else {
+          Alert.alert('Lỗi khi xóa', error.message);
+        }
       }
     };
 
@@ -210,6 +235,21 @@ export default function App() {
             <Text style={styles.warningText}>
               Đang ở chế độ Mock (Chưa cấu hình firebaseConfig.js).
             </Text>
+          </View>
+        )}
+
+        {/* Banner cảnh báo nếu Firebase bị chặn quyền truy cập Rules */}
+        {permissionError && (
+          <View style={styles.errorBanner}>
+            <Ionicons name="alert-circle" size={24} color="#721c24" />
+            <View style={{ flex: 1, marginLeft: 8 }}>
+              <Text style={styles.errorTitle}>Firebase chưa cấp quyền (Permission Denied)</Text>
+              <Text style={styles.errorText}>
+                Vào Firebase Console → Firestore Database → tab "Rules", đổi thành:{'\n'}
+                <Text style={{ fontWeight: 'bold' }}>allow read, write: if true;</Text>{'\n'}
+                rồi bấm nút "Publish".
+              </Text>
+            </View>
           </View>
         )}
 
@@ -376,6 +416,28 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginLeft: 8,
     flex: 1,
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#f8d7da',
+    padding: 12,
+    marginHorizontal: 16,
+    marginTop: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#f5c6cb',
+  },
+  errorTitle: {
+    color: '#721c24',
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  errorText: {
+    color: '#721c24',
+    fontSize: 12,
+    lineHeight: 18,
   },
   header: {
     flexDirection: 'row',
