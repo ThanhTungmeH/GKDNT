@@ -3,10 +3,6 @@ import { Platform } from 'react-native';
 // =====================================================================
 // CẤU HÌNH TẢI ẢNH LÊN CLOUDINARY
 // =====================================================================
-export const CLOUDINARY_CONFIG = {
-  cloudName: 'do46eak3c',
-  uploadPreset: 'hihihaha',
-};
 
 /**
  * Hàm upload ảnh lên Cloudinary
