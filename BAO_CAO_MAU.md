@@ -152,3 +152,4 @@
 
 ### PHẦN 7: KẾT LUẬN
 - Đã hoàn thành 100% các yêu cầu của đề tài: xây dựng ứng dụng CRUD hoàn chỉnh, kết nối cơ sở dữ liệu thời gian thực Firebase Firestore, tương thích đa nền tảng, có đầy đủ báo cáo, video demo và link GitHub đạt chuẩn.
+
